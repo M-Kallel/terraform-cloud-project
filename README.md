@@ -134,3 +134,5 @@ Empty test application buckets including versions/delete markers if you delibera
 ## 8. Prepare your submission
 
 Capture the successful Actions checks and approval, VPC/subnets, healthy target group, ASG/AZ placement, private RDS, S3 backend settings, hostname page, failover log, scaling and destroy summary. Redact credentials. Give the instructor repository access. Suggested 10–15 page report: objectives (1), architecture and routing (2), modules and environment design (2), IAM and security (1–2), S3 backend and Academy constraints (1), pipeline (2), tests and screenshots (2–3), costs and conclusion (1). For the defense use seven slides covering problem, architecture, modules, state/security, pipeline, live failover, and cost/cleanup. Populate all results from your actual run.
+
+In AWS Academy, each environment uses a pre-created application bucket. Terraform manages its public-access block, encryption, versioning, and lifecycle rule. The separate S3 backend bucket stores Terraform state.
