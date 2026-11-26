@@ -1,0 +1,96 @@
+name: Terraform Academy
+on:
+  pull_request:
+  workflow_dispatch:
+    inputs:
+      target:
+        type: choice
+        options: [dev, test, prod]
+        required: true
+      operation:
+        type: choice
+        options: [apply, destroy]
+        required: true
+permissions:
+  contents: read
+jobs:
+  format:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: 1.10.5
+      - run: terraform fmt -check -recursive
+  plan:
+    needs: format
+    if: github.event_name == 'pull_request' || github.ref == 'refs/heads/main'
+    strategy:
+      fail-fast: false
+      matrix:
+        target: ${{ github.event_name == 'pull_request' && fromJSON('["dev","test","prod"]') || fromJSON(format('["{0}"]', inputs.target)) }}
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: environments/${{ matrix.target }}
+    env:
+      AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+      AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+      AWS_SESSION_TOKEN: ${{ secrets.AWS_SESSION_TOKEN }}
+      AWS_REGION: ${{ vars.AWS_REGION }}
+      STATE_BUCKET: ${{ vars.STATE_BUCKET }}
+      OPERATION: ${{ inputs.operation }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: 1.10.5
+      - run: aws sts get-caller-identity
+      - run: terraform init -input=false -backend-config="bucket=$STATE_BUCKET" -backend-config="region=$AWS_REGION"
+      - run: terraform validate
+      - name: Generate plan
+        run: |
+          flags=()
+          if [[ "$OPERATION" == destroy ]]; then flags+=(-destroy); fi
+          terraform plan -input=false -lock-timeout=2m -var-file=terraform.tfvars.example "${flags[@]}" -out=review.tfplan
+          terraform show -no-color review.tfplan > plan.txt
+      - uses: actions/upload-artifact@v4
+        with:
+          name: readable-${{ matrix.target }}
+          path: environments/${{ matrix.target }}/plan.txt
+          retention-days: 1
+      - uses: actions/upload-artifact@v4
+        if: github.event_name == 'workflow_dispatch'
+        with:
+          name: approved-inputs
+          include-hidden-files: true
+          path: |
+            environments/${{ matrix.target }}/review.tfplan
+            environments/${{ matrix.target }}/.terraform.lock.hcl
+          retention-days: 1
+  deploy:
+    needs: plan
+    if: github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main'
+    environment: ${{ inputs.target }}
+    concurrency: deploy-${{ inputs.target }}
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: environments/${{ inputs.target }}
+    env:
+      AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+      AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+      AWS_SESSION_TOKEN: ${{ secrets.AWS_SESSION_TOKEN }}
+      AWS_REGION: ${{ vars.AWS_REGION }}
+      STATE_BUCKET: ${{ vars.STATE_BUCKET }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: 1.10.5
+      - uses: actions/download-artifact@v4
+        with:
+          name: approved-inputs
+          path: environments/${{ inputs.target }}
+      - run: terraform init -lockfile=readonly -input=false -backend-config="bucket=$STATE_BUCKET" -backend-config="region=$AWS_REGION"
+      - run: terraform apply -input=false -lock-timeout=2m review.tfplan
