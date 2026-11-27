@@ -34,3 +34,8 @@ variable "tags" {
   type        = map(string)
   description = "Tags for this environment."
 }
+variable "ami_id" {
+  description = "AMI to use for EC2 instances. Defaults to the latest matching Amazon Linux image."
+  type        = string
+  default     = null
+}

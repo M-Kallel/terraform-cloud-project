@@ -38,6 +38,7 @@ module "compute" {
   desired_capacity = var.desired_capacity
   tags             = local.tags
   depends_on       = [module.network, module.security, module.load_balancer]
+  ami_id           = "ami-062caee4b7b602eb0"
 }
 module "database" {
   source            = "../../modules/database"
