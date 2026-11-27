@@ -5,6 +5,6 @@ owner = "Mootez-Kallel"
 vpc_cidr = "10.21.0.0/16"
 instance_type = "t3.micro"
 min_size = 2
-desired_capacity = 2
+desired_capacity = 3
 max_size = 4
 db_instance_class = "db.t3.micro"
