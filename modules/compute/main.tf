@@ -8,7 +8,7 @@ data "aws_ami" "linux" {
 }
 resource "aws_launch_template" "web" {
   name_prefix            = "${var.prefix}-"
-  image_id               = data.aws_ami.linux.id
+  image_id               = var.ami_id != null ? var.ami_id : data.aws_ami.linux.id
   instance_type          = var.instance_type
   vpc_security_group_ids = [var.app_sg]
   user_data              = filebase64("${path.module}/user_data.sh")
